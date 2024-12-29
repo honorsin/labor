@@ -14,34 +14,32 @@ func NewResponseRecorder() ResponseRecorder {
 	return ResponseRecorder{httptest.NewRecorder()}
 }
 
-var _ js.Wrapper = ResponseRecorder{}
 
 func (rr ResponseRecorder) JSValue() js.Value {
-	var res = rr.Result()
+    res := rr.Result()
+    
+    // Create a proper JS Response object
+    jsResponse := js.Global().Get("Object").New()
+    
+    // Handle body
+    if res.ContentLength != 0 {
+        b, _ := ioutil.ReadAll(res.Body)
+        uint8Array := js.Global().Get("Uint8Array").New(len(b))
+        js.CopyBytesToJS(uint8Array, b)
+        jsResponse.Set("body", uint8Array)
+    }
 
-	var body js.Value = js.Undefined()
-	if res.ContentLength != 0 {
-		var b, err = ioutil.ReadAll(res.Body)
-		if err != nil {
-			panic(err)
-		}
-		body = js.Global().Get("Uint8Array").New(len(b))
-		js.CopyBytesToJS(body, b)
-	}
+    // Handle headers
+    headers := js.Global().Get("Object").New()
+    for k, v := range res.Header {
+        if len(v) > 0 {
+            headers.Set(k, v[0])
+        }
+    }
+    jsResponse.Set("headers", headers)
+    
+    // Set status
+    jsResponse.Set("status", res.StatusCode)
 
-	var init = make(map[string]interface{}, 2)
-
-	if res.StatusCode != 0 {
-		init["status"] = res.StatusCode
-	}
-
-	if len(res.Header) != 0 {
-		var headers = make(map[string]interface{}, len(res.Header))
-		for k := range res.Header {
-			headers[k] = res.Header.Get(k)
-		}
-		init["headers"] = headers
-	}
-
-	return js.Global().Get("Response").New(body, init)
+    return jsResponse
 }

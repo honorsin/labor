@@ -9,17 +9,23 @@
     async function hello() {
       const name = document.querySelector("#name").value
 
-      const res = await fetch('api/hello', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name })
-      })
+      try {
+        const res = await fetch('api/hello', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({message: "Hello from JS!"})
+        })
 
-      const data = await res.json()
+        const data = await res.json()
 
-      document.querySelector('#out').innerHTML = JSON.stringify(data)
+        document.querySelector('#out').innerHTML = JSON.stringify(data)
+      }
+      catch(e) {
+        console.error(e)
+      }
+
 
     }
   </script>

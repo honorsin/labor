@@ -3,46 +3,57 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"syscall/js"
-
-	labor "github.com/yisar/labor"
 )
 
 func main() {
+	fmt.Println("WASM Started")
 
-	js.Global().Get("labor").Get("http").Set("get", js.FuncOf(func (this js.Value, args []js.Value) interface{} {
+	js.Global().Get("labor").Get("http").Set("get", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		fmt.Println("Get handler called")
 		path := args[0].String()
-		httpGet(path)
-		return nil
+		fmt.Printf("Path: %s\n", path)
+		return createResponse(path)
 	}))
 
-	js.Global().Get("labor").Get("http").Set("serve", js.FuncOf(func (this js.Value, args []js.Value) interface{} {
-		labor.Serve(nil)
-		return nil
-	}))
-
-	js.Global().Get("labor").Get("http").Set("download", js.FuncOf(func (this js.Value, args []js.Value) interface{} {
-		body := labor.Download(args[0].String())
-		return body
-	}))
-
+	fmt.Println("Handler registered")
 	select {}
 }
 
-func httpGet(path string) interface{}{
-	http.HandleFunc(path, func(res http.ResponseWriter, req *http.Request) {
-		params := make(map[string]string)
-		if err := json.NewDecoder(req.Body).Decode(&params); err != nil {
-			panic(err)
+func createResponse(path string) interface{} {
+	fmt.Println("Creating response")
+	
+	promise := js.Global().Get("Promise").New(js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		resolve := args[0]
+		fmt.Println("Promise executor running")
+
+		// 直接解析 Promise，不使用 goroutine
+		response := map[string]interface{}{
+			"message": "Hello from WASM!",
+			"path":    path,
 		}
 
-		res.Header().Add("Content-Type", "application/json")
-		if err := json.NewEncoder(res).Encode(map[string]string{
-			"message": fmt.Sprintf("Hello %s!", params["name"]),
-		}); err != nil {
-			panic(err)
-		}
-	})
-	return nil
+		jsResponse := js.Global().Get("Object").New()
+		jsResponse.Set("ok", true)
+		jsResponse.Set("status", 200)
+
+		responseBytes, _ := json.Marshal(response)
+		uint8Array := js.Global().Get("Uint8Array").New(len(responseBytes))
+		js.CopyBytesToJS(uint8Array, responseBytes)
+
+		jsResponse.Set("json", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+			return js.Global().Get("Promise").New(js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+				resolveJson := args[0]
+				resolveJson.Invoke(js.ValueOf(response))
+				return nil
+			}))
+		}))
+
+		fmt.Println("Resolving promise")
+		resolve.Invoke(jsResponse)
+		return nil
+	}))
+
+	fmt.Println("Returning promise")
+	return promise
 }

@@ -9,7 +9,8 @@ $ cd demo
 $ yarn build
 $ yarn dev
 ```
-
+运行时记得要把wasm_exec改成自己go版本适配的：
+cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" ./demo/wasm_exec.js
 ### Detail
 
 ```js
