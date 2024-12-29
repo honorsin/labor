@@ -1,78 +1,51 @@
 importScripts('./labor.js')
 
-let laborInstance = null;
-
-// 首先注册 fetch 事件处理程序
-addEventListener('fetch', event => {
-    const url = new URL(event.request.url);
-    console.log('Fetch event:', url.pathname);
-    
-    if (url.pathname.startsWith('/api/')) {
-        event.respondWith((async () => {
-            console.log('Handling API request');
-            try {
-                // 等待 labor 实例初始化
-                if (!laborInstance) {
-                    console.log('Waiting for labor initialization...');
-                    return new Response(JSON.stringify({ error: 'System initializing' }), {
-                        status: 503,
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Access-Control-Allow-Origin': '*'
-                        }
-                    });
-                }
-
-                console.log('Calling labor.http.get');
-                const response = await laborInstance.http.get(url.pathname);
-                console.log('Got response from WASM:', response);
-                
-                const data = await response.json();
-                console.log('Parsed JSON:', data);
-                
-                return new Response(JSON.stringify(data), {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*'
-                    }
-                });
-            } catch (error) {
-                console.error('Error in fetch handler:', error);
-                return new Response(JSON.stringify({ error: error.message }), {
-                    status: 500,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*'
-                    }
-                });
-            }
-        })());
-    }
-});
-
 addEventListener('install', (event) => {
-    console.log('Service Worker installing...');
-    event.waitUntil(skipWaiting());
-});
+  console.log('Service Worker installing...');
+  event.waitUntil(skipWaiting());
+})
 
 addEventListener('activate', event => {
-    console.log('Service Worker activating...');
-    event.waitUntil(clients.claim());
+  console.log('Service Worker activating...');
+  event.waitUntil(clients.claim());
+})
+
+// 处理模块文件的请求
+addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  if (url.pathname.endsWith('.js')) {
+    console.log('Fetching module:', url.pathname);
+    event.respondWith(fetch(event.request));
+  }
 });
 
-// 然后初始化 labor
+// 初始化 WASM
 registerLaborListener('out.wasm', { base: 'api' })
-    .then((labor) => {
-        console.log('Labor initialized');
-        laborInstance = labor;
-        
-        console.log('Executing labor setup');
-        excute(`
-            const http = require('http')
-            http.get('/hello')
-        `);
-        console.log('Labor setup complete');
-    })
-    .catch(error => {
-        console.error('Labor initialization error:', error);
-    });
+  .then(async (labor) => {
+    console.log('Labor initialized');
+    
+    try {
+      // 预加载所有需要的模块
+      console.log('Preloading modules...');
+      await labor.preloadModule('./main');
+      await labor.preloadModule('./utils');
+      console.log('Modules preloaded');
+      
+      // 现在可以同步加载模块
+      console.log('Loading main module...');
+      const mainModule = labor.require('./main');
+      console.log('Main module loaded:', mainModule);
+      
+      console.log('Main module exports:', Object.keys(mainModule));
+      console.log('Init function:', mainModule.init);
+      
+      const result = mainModule.init();
+      console.log('Main module initialized with result:', result);
+    } catch (error) {
+      console.error('Error in main module:', error);
+      console.error('Stack:', error.stack);
+    }
+  })
+  .catch(error => {
+    console.error('Labor initialization error:', error);
+  });

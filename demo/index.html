@@ -2,39 +2,25 @@
 <html>
 
 <head>
-  <title>demo</title>
-  <script>
-    navigator.serviceWorker.register('sw.js')
-
-    async function hello() {
-      const name = document.querySelector("#name").value
-
-      try {
-        const res = await fetch('api/hello', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({message: "Hello from JS!"})
-        })
-
-        const data = await res.json()
-
-        document.querySelector('#out').innerHTML = JSON.stringify(data)
-      }
-      catch(e) {
-        console.error(e)
-      }
-
-
-    }
-  </script>
+  <meta charset="utf-8">
+  <title>Labor Module System Demo</title>
 </head>
 
 <body>
-  <label for="name">Name: </label><input id="name" value="World">
-  <button onclick="hello()">Hello</button>
-  <pre id="out"></pre>
+  <h1>Labor Module System Demo</h1>
+  <div id="result"></div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(registration => {
+          console.log('ServiceWorker registration successful');
+        })
+        .catch(err => {
+          console.error('ServiceWorker registration failed:', err);
+        });
+    }
+  </script>
 </body>
 
 </html>
